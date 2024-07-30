@@ -12,6 +12,11 @@ using namespace patch_sm;
 #define TIME_CV CV_2
 #define FEEDBACK_CV CV_3
 
+#define VCA_1_CV CV_4
+#define VCA_2_CV CV_5
+#define VCA_3_CV CV_6
+#define VCA_4_CV CV_7
+
 #define TIME_KNOB ADC_10
 #define FEEDBACK_KNOB CV_8
 #define SKEW_KNOB ADC_9

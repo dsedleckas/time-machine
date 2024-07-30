@@ -18,6 +18,12 @@ struct CalibrationData {
 	float timeCvOffset = 0.0;
 	float skewCvOffset = 0.0;
 	float feedbackCvOffset = 0.0;
+	
+	float vca1CvOffset = 0.0;
+    float vca2CvOffset = 0.0;
+    float vca3CvOffset = 0.0;
+    float vca4CvOffset = 0.0;
+	
 	int calibrated = false;
 
 	//Overloading the != operator
@@ -27,6 +33,10 @@ struct CalibrationData {
 				a.timeCvOffset==skewCvOffset && \
 				a.skewCvOffset==skewCvOffset && \
 				a.feedbackCvOffset==feedbackCvOffset && \
+				a.vca1CvOffset==vca1CvOffset && \
+				a.vca2CvOffset==vca2CvOffset && \
+				a.vca3CvOffset==vca3CvOffset && \
+				a.vca4CvOffset==vca4CvOffset && \
 				a.calibrated==calibrated
 			);
     }
@@ -54,10 +64,22 @@ Slew timeCvSlew;
 Slew feedbackCvSlew;
 Slew distributionCvSlew;
 
+Slew vca1CvSlew;
+Slew vca2CvSlew;
+Slew vca3CvSlew;
+Slew vca4CvSlew;
+
 // global storage for CV/knobs so we don't get them twice to print diagnostics
 float timeCv = 0.0;
 float feedbackCv = 0.0;
 float skewCv = 0.0;
+
+float vca1Cv = 0.0;
+float vca2Cv = 0.0;
+float vca3Cv = 0.0;
+float vca4Cv = 0.0;
+
+
 float timeKnob = 0.0;
 float feedbackKnob = 0.0;
 float skewKnob = 0.0;
@@ -68,6 +90,11 @@ float delaySliders = 0.0;
 float timeCvOffset = 0.0;
 float feedbackCvOffset = 0.0;
 float skewCvOffset = 0.0;
+
+float vca1CvOffset = 0.0;
+float vca2CvOffset = 0.0;
+float vca3CvOffset = 0.0;
+float vca4CvOffset = 0.0;
 
 float finalTimeValue = 0.0;
 float finalDistributionValue = 0.0;
@@ -98,6 +125,11 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 	timeCv = clamp(hw.GetAdcValue(TIME_CV) - timeCvOffset, -1, 1);
 	feedbackCv = clamp(hw.GetAdcValue(FEEDBACK_CV) - feedbackCvOffset, -1, 1);
 	skewCv = clamp(hw.GetAdcValue(SKEW_CV) - skewCvOffset, -1, 1);
+
+	vca1Cv = clamp(hw.GetAdcValue(VCA_1_CV) - vca1CvOffset, -1, 1);
+	vca2Cv = clamp(hw.GetAdcValue(VCA_2_CV) - vca2CvOffset, -1, 1);
+	vca3Cv = clamp(hw.GetAdcValue(VCA_3_CV) - vca3CvOffset, -1, 1);
+	vca4Cv = clamp(hw.GetAdcValue(VCA_4_CV) - vca4CvOffset, -1, 1);
 
 	drySlider = minMaxSlider(1.0 - hw.GetAdcValue(DRY_SLIDER));
 
@@ -185,10 +217,16 @@ bool shouldCalibrate() {
 			(hw.GetAdcValue(SKEW_CV) < 0.01) && \
 			(hw.GetAdcValue(TIME_CV) < 0.01) && \
 			(hw.GetAdcValue(FEEDBACK_CV) < 0.01) && \
+			(hw.GetAdcValue(VCA_1_CV) < 0.01) && \
+			(hw.GetAdcValue(VCA_2_CV) < 0.01) && \
+			(hw.GetAdcValue(VCA_3_CV) < 0.01) && \
+			(hw.GetAdcValue(VCA_4_CV) < 0.01) && \
 			hw.gate_in_2.State();
+		
 		for(int i=0; i<9; i++) {
 			shouldCalibrate &= hw.GetSliderValue(i) < 0.01;
 		}
+
 		shouldCalibrate &= minMaxKnob(1.0 - hw.GetAdcValue(TIME_KNOB)) > 0.95;
 		shouldCalibrate &= minMaxKnob(1.0 - hw.GetAdcValue(SKEW_KNOB)) > 0.95;
 		shouldCalibrate &= minMaxKnob(1.0 - hw.GetAdcValue(FEEDBACK_KNOB)) > 0.95;
@@ -227,9 +265,16 @@ int main(void)
 	timeKnobSlew.Init(0.5, 0.0005);
 	feedbackKnobSlew.Init(0.5, 0.0005);
 	distributionKnobSlew.Init(0.5, 0.0005);
+	
 	timeCvSlew.Init(0.5, 0.0005);
 	feedbackCvSlew.Init(0.5, 0.0005);
 	distributionCvSlew.Init(0.5, 0.0005);
+
+	vca1CvSlew.Init(0.5, 0.0005);
+	vca2CvSlew.Init(0.5, 0.0005);
+	vca3CvSlew.Init(0.5, 0.0005);
+	vca4CvSlew.Init(0.5, 0.0005);
+
 
 	// init clock rate detector
 	clockRateDetector.Init(hw.AudioSampleRate());
@@ -283,6 +328,12 @@ int main(void)
 				savedCalibrationData.timeCvOffset += timeCv;
 				savedCalibrationData.skewCvOffset += skewCv;
 				savedCalibrationData.feedbackCvOffset += feedbackCv;
+
+				savedCalibrationData.vca1CvOffset += vca1Cv;
+				savedCalibrationData.vca2CvOffset += vca2Cv;
+				savedCalibrationData.vca3CvOffset += vca3Cv;
+				savedCalibrationData.vca4CvOffset += vca4Cv;
+
 				// wait 10ms
 				System::Delay(10);
 				// set LEDs
@@ -296,6 +347,11 @@ int main(void)
 			savedCalibrationData.timeCvOffset = savedCalibrationData.timeCvOffset / ((float)numSamples);
 			savedCalibrationData.skewCvOffset = savedCalibrationData.skewCvOffset / ((float)numSamples);
 			savedCalibrationData.feedbackCvOffset = savedCalibrationData.feedbackCvOffset / ((float)numSamples);
+
+			savedCalibrationData.vca1CvOffset = savedCalibrationData.vca1CvOffset / ((float)numSamples);
+			savedCalibrationData.vca2CvOffset = savedCalibrationData.vca2CvOffset / ((float)numSamples);
+			savedCalibrationData.vca3CvOffset = savedCalibrationData.vca3CvOffset / ((float)numSamples);
+			savedCalibrationData.vca4CvOffset = savedCalibrationData.vca4CvOffset / ((float)numSamples);
 			
 			// set calibrated value to true
 			savedCalibrationData.calibrated = true;
@@ -308,6 +364,10 @@ int main(void)
 	timeCvOffset = savedCalibrationData.timeCvOffset;
 	skewCvOffset = savedCalibrationData.skewCvOffset;
 	feedbackCvOffset = savedCalibrationData.feedbackCvOffset;
+	vca1CvOffset = savedCalibrationData.vca1CvOffset;
+	vca2CvOffset = savedCalibrationData.vca2CvOffset;
+	vca3CvOffset = savedCalibrationData.vca3CvOffset;
+	vca4CvOffset = savedCalibrationData.vca4CvOffset;
 
 	hw.StartLog();
 
@@ -319,6 +379,12 @@ int main(void)
 		hw.PrintLine("TIME_CV: " FLT_FMT(6), FLT_VAR(6, timeCv));
 		hw.PrintLine("FEEDBACK_CV: " FLT_FMT(6), FLT_VAR(6, feedbackCv));
 		hw.PrintLine("SKEW_CV: " FLT_FMT(6), FLT_VAR(6, skewCv));
+		
+		hw.PrintLine("VCA_1_CV: " FLT_FMT(6), FLT_VAR(6, vca1Cv));
+		hw.PrintLine("VCA_2_CV: " FLT_FMT(6), FLT_VAR(6, vca2Cv));
+		hw.PrintLine("VCA_3_CV: " FLT_FMT(6), FLT_VAR(6, vca3Cv));
+		hw.PrintLine("VCA_4_CV: " FLT_FMT(6), FLT_VAR(6, vca4Cv));
+		
 		hw.PrintLine("TIME_KNOB: " FLT_FMT(6), FLT_VAR(6, timeKnob));
 		hw.PrintLine("FEEDBACK_KNOB: " FLT_FMT(6), FLT_VAR(6, feedbackKnob));
 		hw.PrintLine("SKEW_KNOB: " FLT_FMT(6), FLT_VAR(6, skewKnob));
