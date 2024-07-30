@@ -67,6 +67,10 @@ Led leds[9];
 	VCA_3_CV, 
 	VCA_4_CV
   };
+
+  float modulation_values_[kNumNormalizedChannels] = { 
+	0.0, 0.0, 0.0, 0.0
+  };
   
 StereoTimeMachine timeMachine;
 ClockRateDetector clockRateDetector;
@@ -101,16 +105,14 @@ float feedbackKnob = 0.0;
 float skewKnob = 0.0;
 float drySlider = 0.0;
 float delaySliders = 0.0;
+float sliderAmpValues_[8] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
 // calibration offsets for CV
 float timeCvOffset = 0.0;
 float feedbackCvOffset = 0.0;
 float skewCvOffset = 0.0;
 
-float vca1CvOffset = 0.0;
-float vca2CvOffset = 0.0;
-float vca3CvOffset = 0.0;
-float vca4CvOffset = 0.0;
+float normalized_offsets_[kNumNormalizedChannels] = {0.0, 0.0, 0.0, 0.0};
 
 float finalTimeValue = 0.0;
 float finalDistributionValue = 0.0;
@@ -122,6 +124,24 @@ bool setLeds = false;
 CpuLoadMeter cpuMeter;
 
 int droppedFrames = 0;
+
+//if modulation is patched, then slider acts as attenuverter for modulation 
+//if modulation is unpatched, slider is 
+//@sliderIdx is between 1 and 8 (incl.); 
+float readHeadAmp(int sliderIdx) {
+	float sliderAmpValue = sliderAmpValues_[sliderIdx - 1];
+	// 4 modulation inputs
+	int modulationIndex = (sliderIdx - 1) / 2;
+	 
+	if (!is_patched_[modulationIndex]) {
+		return sliderAmpValue;
+	} 
+	// between -1 & 1
+	// -1 is silent, 1 is max volume
+	float modulationValue = modulation_values_[modulationIndex];
+	
+	return sliderAmpValue * modulationValue;
+}
 
 // called every N samples (search for SetAudioBlockSize)
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
@@ -142,12 +162,20 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 	feedbackCv = clamp(hw.GetAdcValue(FEEDBACK_CV) - feedbackCvOffset, -1, 1);
 	skewCv = clamp(hw.GetAdcValue(SKEW_CV) - skewCvOffset, -1, 1);
 
-	vca1Cv = clamp(hw.GetAdcValue(VCA_1_CV) - vca1CvOffset, -1, 1);
-	vca2Cv = clamp(hw.GetAdcValue(VCA_2_CV) - vca2CvOffset, -1, 1);
-	vca3Cv = clamp(hw.GetAdcValue(VCA_3_CV) - vca3CvOffset, -1, 1);
-	vca4Cv = clamp(hw.GetAdcValue(VCA_4_CV) - vca4CvOffset, -1, 1);
-
+	// read modulation / normalized channels 
+	for (int i = 0; i < kNumNormalizedChannels; i++) {
+		modulation_values_[i] = 
+			clamp(
+				hw.GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
+				-1, 
+				1);
+	}
+	
+	// read slider values
 	drySlider = minMaxSlider(1.0 - hw.GetAdcValue(DRY_SLIDER));
+	for (int i = 1; i < 9; i++) {
+		sliderAmpValues_[i-1] = max(0.0f, minMaxSlider(1.0f - hw.GetSliderValue(i)));
+	}
 
 	// calculate time based on clock if present, otherwise simple time
 	float time = 0.0; 
@@ -201,13 +229,13 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 		// let last 8 slider time/amp/blur values for left channel time machine instance
         timeMachine.timeMachineLeft.readHeads[i-1].Set(
             spread((i / 8.0), distribution) * time,
-            max(0.0f, minMaxSlider(1.0f - hw.GetSliderValue(i))),
+            readHeadAmp(i),
 			max(0., feedback-1.0)
         );
 		// let last 8 slider time/amp/blur values for right channel time machine instance
 		timeMachine.timeMachineRight.readHeads[i-1].Set(
             spread((i / 8.0), distribution) * time,
-            max(0.0f, minMaxSlider(1.0f - hw.GetSliderValue(i))),
+            readHeadAmp(i),
 			max(0., feedback-1.0)
         );
 	}
@@ -414,10 +442,10 @@ int main(void)
 	timeCvOffset = savedCalibrationData.timeCvOffset;
 	skewCvOffset = savedCalibrationData.skewCvOffset;
 	feedbackCvOffset = savedCalibrationData.feedbackCvOffset;
-	vca1CvOffset = savedCalibrationData.vca1CvOffset;
-	vca2CvOffset = savedCalibrationData.vca2CvOffset;
-	vca3CvOffset = savedCalibrationData.vca3CvOffset;
-	vca4CvOffset = savedCalibrationData.vca4CvOffset;
+	normalized_offsets_[0] = savedCalibrationData.vca1CvOffset;
+	normalized_offsets_[1] = savedCalibrationData.vca2CvOffset;
+	normalized_offsets_[2] = savedCalibrationData.vca3CvOffset;
+	normalized_offsets_[3] = savedCalibrationData.vca4CvOffset;
 
 	hw.StartLog();
 
