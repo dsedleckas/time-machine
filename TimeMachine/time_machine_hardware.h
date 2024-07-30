@@ -162,6 +162,8 @@ namespace time_machine
 
         float GetSliderValue(int idx);
 
+        void WriteNormalization(bool value); 
+
         /** Returns the STM32 port/pin combo for the desired pin (or an invalid pin for HW only pins)
          *
          *  Macros at top of file can be used in place of separate arguments (i.e. GetPin(A4), etc.)

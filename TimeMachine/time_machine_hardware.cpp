@@ -503,6 +503,14 @@ namespace time_machine
         }
     }
 
+    void TimeMachineHardware::WriteNormalization(bool value) {
+        if (value) {
+            pimpl_->WriteCvOut(CV_OUT_1, 5.0);
+        } else {
+            pimpl_->WriteCvOut(CV_OUT_1, 0.0);
+        }
+    }
+
     dsy_gpio_pin TimeMachineHardware::GetPin(const PinBank bank, const int idx)
     {
         if(idx <= 0 || idx > 10)

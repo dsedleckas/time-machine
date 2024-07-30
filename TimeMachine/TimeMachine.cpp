@@ -10,7 +10,7 @@ using namespace std;
 
 #define TIME_SECONDS 150
 #define BUFFER_WIGGLE_ROOM_SAMPLES 1000
-
+#define DEVELOPMENT_MODE true
 #define LINEAR_TIME false
 
 //Setting Struct containing parameters we want to save to flash
@@ -52,6 +52,22 @@ PersistentStorage<CalibrationData> CalibrationDataStorage(hw.qspi);
 GateIn gate;
 Led leds[9];
 
+// Keep track of the agreement between the random sequence sent to the 
+  // switch and the value read by the ADC.
+  uint32_t normalization_detection_count_ = 0;
+  uint32_t normalization_probe_state_ = 0;
+
+  const uint8_t kNumNormalizedChannels = 4;
+  const uint8_t kProbeSequenceDuration = 32;
+  uint8_t normalization_probe_mismatches_[kNumNormalizedChannels] = {0, 0, 0, 0}; 
+  bool is_patched_[kNumNormalizedChannels] = {false, false, false, false};
+  int normalized_channels_[kNumNormalizedChannels] = { 
+	VCA_1_CV,
+	VCA_2_CV,
+	VCA_3_CV, 
+	VCA_4_CV
+  };
+  
 StereoTimeMachine timeMachine;
 ClockRateDetector clockRateDetector;
 ContSchmidt timeKnobSchmidt;
@@ -233,6 +249,40 @@ bool shouldCalibrate() {
 		return shouldCalibrate;
 }
 
+void DetectNormalization() {
+  bool expected_value = normalization_probe_state_ >> 31;
+  for (int i = 0; i < kNumNormalizedChannels; ++i) {
+    int channel = normalized_channels_[i];
+	float value = hw.GetAdcValue(channel);
+	bool read_value;
+	if (value > 4.95) {
+		read_value = true;
+	} else if (value < 0.05) {
+		read_value = false;
+	}
+	else {
+		++normalization_probe_mismatches_[i];
+		continue;
+	}
+
+    if (expected_value != read_value) {
+      ++normalization_probe_mismatches_[i];
+    }
+  }
+  
+  ++normalization_detection_count_;
+  if (normalization_detection_count_ == kProbeSequenceDuration) {
+    normalization_detection_count_ = 0;
+    for (int i = 0; i < kNumNormalizedChannels; ++i) {
+      is_patched_[i] = normalization_probe_mismatches_[i] >= 2;
+      normalization_probe_mismatches_[i] = 0;
+    }
+  }
+
+  normalization_probe_state_ = 1103515245 * normalization_probe_state_ + 12345;
+  hw.WriteNormalization(normalization_probe_state_ >> 31);
+}
+
 int main(void)
 {
 	// init time machine hardware
@@ -374,48 +424,71 @@ int main(void)
 	setLeds = true;
 
 	while(1) {
+		DetectNormalization(); 
 
-		// print diagnostics
-		hw.PrintLine("TIME_CV: " FLT_FMT(6), FLT_VAR(6, timeCv));
-		hw.PrintLine("FEEDBACK_CV: " FLT_FMT(6), FLT_VAR(6, feedbackCv));
-		hw.PrintLine("SKEW_CV: " FLT_FMT(6), FLT_VAR(6, skewCv));
-		
-		hw.PrintLine("VCA_1_CV: " FLT_FMT(6), FLT_VAR(6, vca1Cv));
-		hw.PrintLine("VCA_2_CV: " FLT_FMT(6), FLT_VAR(6, vca2Cv));
-		hw.PrintLine("VCA_3_CV: " FLT_FMT(6), FLT_VAR(6, vca3Cv));
-		hw.PrintLine("VCA_4_CV: " FLT_FMT(6), FLT_VAR(6, vca4Cv));
-		
-		hw.PrintLine("TIME_KNOB: " FLT_FMT(6), FLT_VAR(6, timeKnob));
-		hw.PrintLine("FEEDBACK_KNOB: " FLT_FMT(6), FLT_VAR(6, feedbackKnob));
-		hw.PrintLine("SKEW_KNOB: " FLT_FMT(6), FLT_VAR(6, skewKnob));
-		hw.PrintLine("GATE IN: %d", hw.gate_in_2.State());
+		if (DEVELOPMENT_MODE) {
+			// print diagnostics
+			hw.PrintLine("TIME_CV: " FLT_FMT(6), FLT_VAR(6, timeCv));
+			hw.PrintLine("FEEDBACK_CV: " FLT_FMT(6), FLT_VAR(6, feedbackCv));
+			hw.PrintLine("SKEW_CV: " FLT_FMT(6), FLT_VAR(6, skewCv));
+			
+			if (is_patched_[0]) {
+				hw.PrintLine("VCA_1_CV: " FLT_FMT(6), FLT_VAR(6, vca1Cv));
+			} else {
+				hw.PrintLine("VCA_1_CV is unpatched!");
+			}
+			
+			if (is_patched_[1]) {
+				hw.PrintLine("VCA_2_CV: " FLT_FMT(6), FLT_VAR(6, vca2Cv));
+			} else {
+				hw.PrintLine("VCA_2_CV is unpatched!");
+			}
 
-		hw.PrintLine("GATE IN: %d", hw.gate_in_1.State());
-		hw.PrintLine("CV IN 1: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_4)));
-		hw.PrintLine("CV IN 2: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_5)));
-		hw.PrintLine("CV IN 3: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_6)));
-		hw.PrintLine("CV IN 4: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_7)));
+			if (is_patched_[2]) {
+				hw.PrintLine("VCA_3_CV: " FLT_FMT(6), FLT_VAR(6, vca3Cv));
+			} else {
+				hw.PrintLine("VCA_3_CV is unpatched!");
+			}
 
-		hw.PrintLine("TIME_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.timeCvOffset));
-		hw.PrintLine("FEEDBACK_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.feedbackCvOffset));
-		hw.PrintLine("SKEW_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.skewCvOffset));
-		hw.PrintLine("CALIBRATED: %d", savedCalibrationData.calibrated);
+			if (is_patched_[3]) {
+				hw.PrintLine("VCA_4_CV: " FLT_FMT(6), FLT_VAR(6, vca4Cv));
+			} else {
+				hw.PrintLine("VCA_4_CV is unpatched!");
+			}
+			
+			hw.PrintLine("TIME_KNOB: " FLT_FMT(6), FLT_VAR(6, timeKnob));
+			hw.PrintLine("FEEDBACK_KNOB: " FLT_FMT(6), FLT_VAR(6, feedbackKnob));
+			hw.PrintLine("SKEW_KNOB: " FLT_FMT(6), FLT_VAR(6, skewKnob));
+			hw.PrintLine("GATE IN: %d", hw.gate_in_2.State());
 
-		hw.PrintLine("FINAL TIME: " FLT_FMT(6), FLT_VAR(6, finalTimeValue));
-		hw.PrintLine("FINAL DISTRIBUTION: " FLT_FMT(6), FLT_VAR(6, finalDistributionValue));
-		hw.PrintLine("FINAL FEEDBACK: " FLT_FMT(6), FLT_VAR(6, finalFeedbackValue));
+			hw.PrintLine("GATE IN: %d", hw.gate_in_1.State());
+			hw.PrintLine("CV IN 1: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_4)));
+			hw.PrintLine("CV IN 2: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_5)));
+			hw.PrintLine("CV IN 3: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_6)));
+			hw.PrintLine("CV IN 4: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_7)));
 
-		hw.PrintLine("CPU AVG: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetAvgCpuLoad()));
-		hw.PrintLine("CPU MIN: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetMinCpuLoad()));
-		hw.PrintLine("CPU MAX: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetMaxCpuLoad()));
+			hw.PrintLine("TIME_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.timeCvOffset));
+			hw.PrintLine("FEEDBACK_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.feedbackCvOffset));
+			hw.PrintLine("SKEW_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.skewCvOffset));
+			hw.PrintLine("CALIBRATED: %d", savedCalibrationData.calibrated);
 
-		hw.PrintLine("DROPPED FRAMES: %d", droppedFrames);
+			hw.PrintLine("FINAL TIME: " FLT_FMT(6), FLT_VAR(6, finalTimeValue));
+			hw.PrintLine("FINAL DISTRIBUTION: " FLT_FMT(6), FLT_VAR(6, finalDistributionValue));
+			hw.PrintLine("FINAL FEEDBACK: " FLT_FMT(6), FLT_VAR(6, finalFeedbackValue));
 
-		for(int i=0; i<9; i++) {
-			hw.PrintLine("%d: " FLT_FMT(6), i, FLT_VAR(6, minMaxSlider(1.0 - hw.GetSliderValue(i))));
+			hw.PrintLine("CPU AVG: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetAvgCpuLoad()));
+			hw.PrintLine("CPU MIN: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetMinCpuLoad()));
+			hw.PrintLine("CPU MAX: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetMaxCpuLoad()));
+
+			hw.PrintLine("DROPPED FRAMES: %d", droppedFrames);
+
+			for(int i=0; i<9; i++) {
+				hw.PrintLine("%d: " FLT_FMT(6), i, FLT_VAR(6, minMaxSlider(1.0 - hw.GetSliderValue(i))));
+			}
+
+			hw.PrintLine("");
+			System::Delay(250);
 		}
-
-		hw.PrintLine("");
-		System::Delay(250);
+		
 	}
 }
