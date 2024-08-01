@@ -27,6 +27,7 @@ public:
     UltraSlowDCBlocker dcblk;
     daisysp::Compressor compressor;
     float (*blurFunc)(float, float) = nullptr;
+
     void Init(float sampleRate, float maxDelay, float* buffer) {
 		this->sampleRate = sampleRate;
         this->bufferSize = seconds_to_samples(maxDelay, sampleRate);

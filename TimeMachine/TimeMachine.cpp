@@ -58,7 +58,7 @@ GateIn gate;
 Led leds[9];
 
 // Keep track of the agreement between the random sequence sent to the 
-  // switch and the value read by the ADC.
+// switch and the value read by the ADC.
   uint32_t normalization_detection_count_ = 0;
   uint32_t normalization_probe_state_ = 0;
 
