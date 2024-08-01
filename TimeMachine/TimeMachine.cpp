@@ -1,6 +1,11 @@
 #include "daisy_patch_sm.h"
 #include "daisysp.h"
-#include "dsp/dsp.h"
+
+#include "dsp/stereo_time_machine.h"
+#include "dsp/slew.h"
+#include "dsp/clock_rate_detector.h"
+#include "dsp/continuous_schmidt.h"
+
 #include "time_machine_hardware.h"
 
 using namespace daisy;
