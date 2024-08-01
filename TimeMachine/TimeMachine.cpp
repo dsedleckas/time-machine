@@ -1,6 +1,6 @@
 #include "daisy_patch_sm.h"
 #include "daisysp.h"
-#include "dsp.h"
+#include "dsp/dsp.h"
 #include "time_machine_hardware.h"
 
 using namespace daisy;
