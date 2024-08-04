@@ -76,6 +76,16 @@ public:
 
         return out;
     }
+
+    // 0 is DRY
+    // 1-8 is ReadHeads
+    float GetLoudness(int idx) {
+        if (idx == 0) {
+            return loudness.Get();
+        } else {
+            return readHeads[idx - 1].loudness.Get();
+        }
+    }
 };
 
 #endif // TIME_MACHINE_H_
