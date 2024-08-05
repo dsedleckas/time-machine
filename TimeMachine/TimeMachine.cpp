@@ -81,8 +81,8 @@ int droppedFrames = 0;
 // if modulation is patched, then slider acts as attenuverter for modulation 
 // if modulation is unpatched, slider is 
 // @sliderIdx is between 1 and 8 (incl.); 
-float readHeadAmp(int sliderIdx) {
-	float sliderAmpValue = sliderAmpValues_[sliderIdx - 1];
+float readHeadAmp(int sliderIdx, Ui ui_local) {
+	float sliderAmpValue = ui_local.sliderAmpValues_[sliderIdx - 1];
 	// 4 modulation inputs
 	int modulationIndex = (sliderIdx - 1) / 2;
 	 
@@ -119,13 +119,13 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 		// let last 8 slider time/amp/blur values for left channel time machine instance
         timeMachine.timeMachineLeft.readHeads[i-1].Set(
             spread((i / 8.0), ui.distribution) * ui.time,
-            readHeadAmp(i),
+            readHeadAmp(i, ui),
 			max(0., ui.feedback-1.0)
         );
 		// let last 8 slider time/amp/blur values for right channel time machine instance
 		timeMachine.timeMachineRight.readHeads[i-1].Set(
             spread((i / 8.0), ui.distribution) * ui.time,
-            readHeadAmp(i),
+            readHeadAmp(i, ui),
 			max(0., ui.feedback-1.0)
         );
 	}
@@ -184,10 +184,13 @@ void DetectNormalization() {
 
 int main(void)
 {
+	
 	// init time machine hardware
     hw.Init();
-	hw.SetAudioBlockSize(4); // number of samples handled per callback
+	hw.StartLog(true);
 
+	hw.SetAudioBlockSize(4); // number of samples handled per callback
+	hw.PrintLine("AUDIO_INITIALIZED");
 	ui.Init(hw);
 
 	calibrator.Init(&calibrationDataStorage);
@@ -223,12 +226,12 @@ int main(void)
 	cpuMeter.Init(hw.AudioSampleRate(), hw.AudioBlockSize());
 
 	// start time machine hardware audio and logging
-    hw.StartAudio(AudioCallback);
-
-	leds.InitStartupSequence();
+    //hw.StartAudio(AudioCallback);
+	hw.PrintLine("AUDIO_CALLBACK_STARTED");
+	//leds.InitStartupSequence();
 
 	// Calibrate if needed
-	calibrator.Calibrate(hw, leds);
+	//calibrator.Calibrate(hw, leds);
 
 	//TODO:  CALIBRATION OFFSETS NEED INJECTING TO UI
 	// timeCvOffset = savedCalibrationData.timeCvOffset;
@@ -239,12 +242,11 @@ int main(void)
 	// normalized_offsets_[2] = savedCalibrationData.vca3CvOffset;
 	// normalized_offsets_[3] = savedCalibrationData.vca4CvOffset;
 
-	hw.StartLog();
 
 	leds.StartUi(); 
-
+	hw.PrintLine("UI STARTED");
 	while(1) {
-		DetectNormalization(); 
+		//DetectNormalization(); 
 
 		if (DEVELOPMENT_MODE) {
 			// print diagnostics
@@ -287,10 +289,10 @@ int main(void)
 			hw.PrintLine("CV IN 3: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_6)));
 			hw.PrintLine("CV IN 4: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_7)));
 
-			hw.PrintLine("TIME_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.timeCvOffset));
-			hw.PrintLine("FEEDBACK_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.feedbackCvOffset));
-			hw.PrintLine("SKEW_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.skewCvOffset));
-			hw.PrintLine("CALIBRATED: %d", savedCalibrationData.calibrated);
+			// hw.PrintLine("TIME_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.timeCvOffset));
+			// hw.PrintLine("FEEDBACK_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.feedbackCvOffset));
+			// hw.PrintLine("SKEW_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.skewCvOffset));
+			// hw.PrintLine("CALIBRATED: %d", savedCalibrationData.calibrated);
 
 			hw.PrintLine("FINAL TIME: " FLT_FMT(6), FLT_VAR(6, finalTimeValue));
 			hw.PrintLine("FINAL DISTRIBUTION: " FLT_FMT(6), FLT_VAR(6, ui.distribution));

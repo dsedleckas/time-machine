@@ -28,15 +28,15 @@ class Calibrator {
                 int numSamples = 128;
                 for(int i = 0; i < numSamples; i++) {
                     
-                    // accumulate cv values
-                    saved_calibration_data_->timeCvOffset += timeCv;
-                    saved_calibration_data_->skewCvOffset += skewCv;
-                    saved_calibration_data_->feedbackCvOffset += feedbackCv;
+                    // // accumulate cv values TODO: properly inject new values
+                    // saved_calibration_data_->timeCvOffset += timeCv;
+                    // saved_calibration_data_->skewCvOffset += skewCv;
+                    // saved_calibration_data_->feedbackCvOffset += feedbackCv;
 
-                    saved_calibration_data_->vca1CvOffset += vca1Cv;
-                    saved_calibration_data_->vca2CvOffset += vca2Cv;
-                    saved_calibration_data_->vca3CvOffset += vca3Cv;
-                    saved_calibration_data_->vca4CvOffset += vca4Cv;
+                    // saved_calibration_data_->vca1CvOffset += vca1Cv;
+                    // saved_calibration_data_->vca2CvOffset += vca2Cv;
+                    // saved_calibration_data_->vca3CvOffset += vca3Cv;
+                    // saved_calibration_data_->vca4CvOffset += vca4Cv;
 
                     // wait 10ms
                     System::Delay(10);
@@ -74,7 +74,7 @@ class Calibrator {
             oam::time_machine::TimeMachineHardware hw,
             oam::time_machine::Leds leds) {
             
-            if (!CheckIfInCalibrationPositions(hw)) return;
+            if (!CheckIfInCalibrationPositions(hw)) return false;
 
             bool calibrationReady = true;
             // do reverse LED startup sequence while

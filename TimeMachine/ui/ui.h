@@ -43,6 +43,12 @@ class Ui {
         float skewKnob = 0.0;
         float drySlider = 0.0;
         float delaySliders = 0.0;
+        
+        //tmp offset values for compilation
+        float timeCvOffset = 0.0;
+        float feedbackCvOffset = 0.0;
+        float skewCvOffset = 0.0;
+
         float sliderAmpValues_[8] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
         float distribution;
@@ -67,7 +73,7 @@ class Ui {
             vca4CvSlew.Init(0.5, 0.0005);
 
             clockRateDetector.Init(hw_->AudioSampleRate());
-               
+
             ProcessAllControls();
         }
 
@@ -88,14 +94,14 @@ class Ui {
             feedbackCv = clamp(hw_->GetAdcValue(FEEDBACK_CV) - feedbackCvOffset, -1, 1);
             skewCv = clamp(hw_->GetAdcValue(SKEW_CV) - skewCvOffset, -1, 1);
 
-            // read modulation / normalized channels 
-            for (int i = 0; i < kNumNormalizedChannels; i++) {
-                modulation_values_[i] = 
-                    clamp(
-                        hw_->GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
-                        -1, 
-                        1);
-            }
+            // // read modulation / normalized channels 
+            // for (int i = 0; i < kNumNormalizedChannels; i++) {
+            //     modulation_values_[i] = 
+            //         clamp(
+            //             hw_->GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
+            //             -1, 
+            //             1);
+            // }
             
             // read slider values
             drySlider = minMaxSlider(1.0 - hw_->GetAdcValue(DRY_SLIDER));
@@ -111,14 +117,14 @@ class Ui {
                 float timeCoef = pow(2.0, (timeKnobSchmidt.Process((1.0-timeKnob)*12)) + (timeCvSchmidt.Process(timeCv*10))) / pow(2.0, 6.0);
                 tmp_time = clockRateDetector.GetInterval() / timeCoef;
                 // make sure time is a power of two less than the max time available in the buffer
-                while(tmp_time > TIME_SECONDS) tmp_time *= 0.5;
+                while(tmp_time > 150) tmp_time *= 0.5;
             } else {
                 // time linear with knob, scaled v/oct style with CV
                 tmp_time = pow(timeKnobSlew.Process(timeKnob), 2.0) * 8.0 / pow(2.0, timeCvSlew.Process(timeCv) * 5.0);
             }
 
             // force time down to a max value (taking whichever is lesser, the max or the time)
-            time = std::min((float)TIME_SECONDS, tmp_time);
+            time = std::min((float)150, tmp_time);
 
             // condition distribution knob value to have deadzone in the middle, add CV
 	        distribution = fourPointWarp(distributionKnobSlew.Process(skewKnob)) + distributionCvSlew.Process(skewCv);
@@ -128,7 +134,7 @@ class Ui {
         }
     
     private:
-        oam::time_machine::TimeMachineHardware* hw_
+        oam::time_machine::TimeMachineHardware* hw_;
 };
 
 
