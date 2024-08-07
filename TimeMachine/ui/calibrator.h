@@ -11,8 +11,8 @@
 
 class Calibrator {
     public:
-        void Init(PersistentStorage<CalibrationData>* cs) {
-            calibration_storage_ = cs;
+        void Init(PersistentStorage<CalibrationData> cs) {
+            calibration_storage_ = &cs;
 
             // load calibration data, using sensible defaults
             calibration_storage_->Init({0.0f, 0.0f, 0.0f, false});

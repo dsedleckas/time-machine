@@ -71,12 +71,10 @@ float finalTimeValue = 0.0;
 float finalDistributionValue = 0.0;
 float finalFeedbackValue = 0.0;
 
-// delay setting LEDs for startup sequences
-bool setLeds = false;
-
 CpuLoadMeter cpuMeter;
 
 int droppedFrames = 0;
+int audioCallBackRun = 0;
 
 // if modulation is patched, then slider acts as attenuverter for modulation 
 // if modulation is unpatched, slider is 
@@ -98,12 +96,16 @@ float readHeadAmp(int sliderIdx, Ui ui_local) {
 
 // called every N samples (search for SetAudioBlockSize)
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
-{
+{	
 	// cpu meter measurements start
 	cpuMeter.OnBlockStart();
 	droppedFrames++;
-
-	ui.ProcessAllControls();
+	audioCallBackRun++; 
+	if (audioCallBackRun > 10000000) { audioCallBackRun = 0; }
+	//hw.PrintLine("AUDIO_CALLBACK_CPU_BLOCK_OK");
+	
+	//ui.ProcessAllControls();
+	//hw.PrintLine("AUDIO_CALLBACK_CONTROLS_PROCESSED");
 
 	for(int i=0; i<9; i++) {
 		float loudnessLeft = timeMachine.timeMachineLeft.GetLoudness(i);
@@ -114,6 +116,8 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 
 	// set time machine dry slider value, feedback, "blur" which is semi-deprecated
 	timeMachine.Set(ui.drySlider, ui.feedback, ui.feedback); // controlling "blur" with feedback now???
+
+	//hw.PrintLine("AUDIO_CALLBACK_DRY_SET");
 
 	for(int i=1; i<9; i++) {
 		// let last 8 slider time/amp/blur values for left channel time machine instance
@@ -130,6 +134,7 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
         );
 	}
 
+
 	for (size_t i = 0; i < size; i++)
 	{
 		// process gate for clock rate detector at audio rate (per-sample) so it calculates clock correctly
@@ -138,9 +143,11 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 		// process input into time machine
 		float* output = timeMachine.Process(in[0][i], in[1][i]);
 		// set hardware output to time machine output
-		out[0][i] = output[0];
-		out[1][i] = output[1];
+		out[0][i] = 0.0; //output[0];
+		out[1][i] = 0.0; //output[1];
 	}
+
+	//hw.PrintLine("AUDIO_CALLBACK_OUTPUT_DONE");
 
 	//cpu meter measurement stop
 	cpuMeter.OnBlockEnd();
@@ -187,13 +194,15 @@ int main(void)
 	
 	// init time machine hardware
     hw.Init();
-	hw.StartLog(true);
 
-	hw.SetAudioBlockSize(4); // number of samples handled per callback
+    //hw.SetAudioBlockSize(4); // number of samples handled per callback
 	hw.PrintLine("AUDIO_INITIALIZED");
+	
 	ui.Init(hw);
+ 	hw.PrintLine("UI_INITIALIZED");
 
-	calibrator.Init(&calibrationDataStorage);
+	calibrator.Init(calibrationDataStorage);
+ 	hw.PrintLine("CALIBRATOR_INITIALIZED");
 
 	dsy_gpio_pin gatePin = DaisyPatchSM::B9;
 	gate.Init(&gatePin);
@@ -209,10 +218,13 @@ int main(void)
 		DaisyPatchSM::D10,
 		DaisyPatchSM::D7,
 		DaisyPatchSM::D6);
-
+	
+	hw.PrintLine("LEDS_INITIALIZED");
 	
 	// set sample rate
 	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
+
+	hw.PrintLine("SAMPELRATE: %d", hw.AudioSampleRate());
 
 	// init time machine
     timeMachine.Init(
@@ -221,12 +233,15 @@ int main(void)
 		bufferLeft, 
 		bufferRight);
 	
+	hw.PrintLine("SAMPELRATE: %d", hw.AudioSampleRate());
+	hw.PrintLine("MAXDELAY: %d", TIME_SECONDS + (((float)BUFFER_WIGGLE_ROOM_SAMPLES) * 0.5 / hw.AudioSampleRate()));
+	hw.PrintLine("SAMPELRATE: %d", hw.AudioSampleRate());
 
 	// init cpu meter
 	cpuMeter.Init(hw.AudioSampleRate(), hw.AudioBlockSize());
 
 	// start time machine hardware audio and logging
-    //hw.StartAudio(AudioCallback);
+    hw.StartAudio(AudioCallback);
 	hw.PrintLine("AUDIO_CALLBACK_STARTED");
 	//leds.InitStartupSequence();
 
@@ -244,9 +259,12 @@ int main(void)
 
 
 	leds.StartUi(); 
-	hw.PrintLine("UI STARTED");
+
+	hw.StartLog(true);
+
 	while(1) {
 		//DetectNormalization(); 
+		ui.ProcessAllControls();
 
 		if (DEVELOPMENT_MODE) {
 			// print diagnostics
@@ -303,6 +321,9 @@ int main(void)
 			hw.PrintLine("CPU MAX: " FLT_FMT(6), FLT_VAR(6, cpuMeter.GetMaxCpuLoad()));
 
 			hw.PrintLine("DROPPED FRAMES: %d", droppedFrames);
+			hw.PrintLine("AUDIO CALLBACK RUN: %d", audioCallBackRun);
+			hw.PrintLine("SAMPELRATE: %d", hw.AudioSampleRate());
+
 
 			for(int i=0; i<9; i++) {
 				hw.PrintLine("%d: " FLT_FMT(6), i, FLT_VAR(6, minMaxSlider(1.0 - hw.GetSliderValue(i))));

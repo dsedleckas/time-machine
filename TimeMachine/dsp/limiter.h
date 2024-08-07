@@ -7,14 +7,13 @@ namespace oam {
     class Limiter {
         public:
             float gainCoef;
-            float attackCoef;
             float releaseCoef;
             void Init(float sampleRate) {
                 gainCoef = 1;
                 releaseCoef = 16.0 / sampleRate;
             }
             float Process(float in) {
-                float targetGainCoef = 1.0 / std::max(abs(in), (float)1.0);
+                float targetGainCoef = 1.0 / std::max(std::abs(in), (float)1.0);
                 if(targetGainCoef < gainCoef) {
                     gainCoef = targetGainCoef;
                 } else {

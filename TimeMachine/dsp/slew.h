@@ -11,6 +11,7 @@ public:
     double noiseCoef = 0.0;
     int settleSamples = 0;
     int settleSamplesThreshold = 96;
+
     void Init(double coef = 0.001, double nf=0.0) {
         this->coef = coef;
         this->noiseFloor = nf;

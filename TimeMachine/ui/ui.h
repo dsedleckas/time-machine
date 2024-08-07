@@ -51,9 +51,9 @@ class Ui {
 
         float sliderAmpValues_[8] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-        float distribution;
-        float feedback;
-        float time;
+        float distribution = 0.0;
+        float feedback = 0.0;
+        float time = 0.0;
 
         void Init(oam::time_machine::TimeMachineHardware hw) {
             hw_ = &hw;
@@ -62,19 +62,29 @@ class Ui {
             timeKnobSlew.Init(0.5, 0.0005);
             feedbackKnobSlew.Init(0.5, 0.0005);
             distributionKnobSlew.Init(0.5, 0.0005);
-            
+
+            hw_->PrintLine("UI_KNOB_SLEW_INITIALIZED"); 
+
             timeCvSlew.Init(0.5, 0.0005);
             feedbackCvSlew.Init(0.5, 0.0005);
             distributionCvSlew.Init(0.5, 0.0005);
+
+            hw_->PrintLine("UI_CV_SLEW_INITIALIZED");
 
             vca1CvSlew.Init(0.5, 0.0005);
             vca2CvSlew.Init(0.5, 0.0005);
             vca3CvSlew.Init(0.5, 0.0005);
             vca4CvSlew.Init(0.5, 0.0005);
 
+            hw_->PrintLine("UI_VCA_CV_SLEW_INITIALIZED");
+
             clockRateDetector.Init(hw_->AudioSampleRate());
 
+            hw_->PrintLine("UI_CLOCK_RATE_DETECTOR_INITIALIZED");
+
             ProcessAllControls();
+
+            hw_->PrintLine("UI_INIT_COMPLETE");
         }
 
         void ProcessClockRate(bool triggered) {

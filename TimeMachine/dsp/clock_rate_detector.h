@@ -15,6 +15,7 @@ public:
     lastVal = false;
   }
   void Init(int sr) { sampleRate = sr; }
+  
   bool isStale() {
     return samplesSinceLastClock > sampleRate * 2;
   }
