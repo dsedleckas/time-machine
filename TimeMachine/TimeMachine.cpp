@@ -89,6 +89,8 @@ Slew vca2CvSlew;
 Slew vca3CvSlew;
 Slew vca4CvSlew;
 
+Slew modulation_slew_[kNumNormalizedChannels] = { vca1CvSlew, vca2CvSlew, vca3CvSlew, vca4CvSlew };
+
 // global storage for CV/knobs so we don't get them twice to print diagnostics
 float timeCv = 0.0;
 float feedbackCv = 0.0;
@@ -142,6 +144,40 @@ float readHeadAmp(int sliderIdx) {
 	
 	return sliderAmpValue * modulationValue;
 }
+ 
+void DetectNormalization() {
+  bool expected_value = normalization_probe_state_ >> 31;
+  for (int i = 0; i < kNumNormalizedChannels; ++i) {
+    int channel = normalized_channels_[i];
+	float value = hw.GetAdcValue(channel);
+	bool read_value;
+	if (value >= 0.5) {
+		read_value = true;
+	} else if (value < 0.5) {
+		read_value = false;
+	}
+	else {
+		++normalization_probe_mismatches_[i];
+		continue;
+	}
+
+    if (expected_value != read_value) {
+      ++normalization_probe_mismatches_[i];
+    }
+  }
+  
+  ++normalization_detection_count_;
+  if (normalization_detection_count_ == kProbeSequenceDuration) {
+    normalization_detection_count_ = 0;
+    for (int i = 0; i < kNumNormalizedChannels; ++i) {
+      is_patched_[i] = normalization_probe_mismatches_[i] >= 2;
+      normalization_probe_mismatches_[i] = 0;
+    }
+  }
+
+  normalization_probe_state_ = 1103515245 * normalization_probe_state_ + 12345;
+  hw.WriteNormalization(normalization_probe_state_ >> 31);
+}
 
 // called every N samples (search for SetAudioBlockSize)
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
@@ -152,6 +188,17 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 
 	// process controls
 	hw.ProcessAllControls();
+	
+	// Throttle normalization detection to run every 44 audio blocks
+	// This reduces CPU usage while still checking frequently enough
+	// Also, normalization CV is slow, if called too fast - stops working. 32 is somewhat fastest that works. 
+	// Set to 44 to be more reliable. 
+	static int normalizationThrottle = 0;
+	normalizationThrottle++;
+	if (normalizationThrottle >= 44) {
+		normalizationThrottle = 0;
+		DetectNormalization();
+	}
 
 	// populate/update global CV/knob vars (time is slewed to reduce noise at large time values)
 	timeKnob = minMaxKnob(1.0 - hw.GetAdcValue(TIME_KNOB), 0.0008);
@@ -165,10 +212,12 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 	// read modulation / normalized channels 
 	for (int i = 0; i < kNumNormalizedChannels; i++) {
 		modulation_values_[i] = 
-			clamp(
-				hw.GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
-				-1, 
-				1);
+			modulation_slew_[i].Process(
+				clamp(
+					hw.GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
+					-1, 
+					1)
+				);
 	}
 	
 	// read slider values
@@ -275,40 +324,6 @@ bool shouldCalibrate() {
 		shouldCalibrate &= minMaxKnob(1.0 - hw.GetAdcValue(SKEW_KNOB)) > 0.95;
 		shouldCalibrate &= minMaxKnob(1.0 - hw.GetAdcValue(FEEDBACK_KNOB)) > 0.95;
 		return shouldCalibrate;
-}
-
-void DetectNormalization() {
-  bool expected_value = normalization_probe_state_ >> 31;
-  for (int i = 0; i < kNumNormalizedChannels; ++i) {
-    int channel = normalized_channels_[i];
-	float value = hw.GetAdcValue(channel);
-	bool read_value;
-	if (value > 4.95) {
-		read_value = true;
-	} else if (value < 0.05) {
-		read_value = false;
-	}
-	else {
-		++normalization_probe_mismatches_[i];
-		continue;
-	}
-
-    if (expected_value != read_value) {
-      ++normalization_probe_mismatches_[i];
-    }
-  }
-  
-  ++normalization_detection_count_;
-  if (normalization_detection_count_ == kProbeSequenceDuration) {
-    normalization_detection_count_ = 0;
-    for (int i = 0; i < kNumNormalizedChannels; ++i) {
-      is_patched_[i] = normalization_probe_mismatches_[i] >= 2;
-      normalization_probe_mismatches_[i] = 0;
-    }
-  }
-
-  normalization_probe_state_ = 1103515245 * normalization_probe_state_ + 12345;
-  hw.WriteNormalization(normalization_probe_state_ >> 31);
 }
 
 int main(void)
@@ -452,7 +467,6 @@ int main(void)
 	setLeds = true;
 
 	while(1) {
-		DetectNormalization(); 
 
 		if (DEVELOPMENT_MODE) {
 			// print diagnostics
@@ -461,25 +475,25 @@ int main(void)
 			hw.PrintLine("SKEW_CV: " FLT_FMT(6), FLT_VAR(6, skewCv));
 			
 			if (is_patched_[0]) {
-				hw.PrintLine("VCA_1_CV: " FLT_FMT(6), FLT_VAR(6, vca1Cv));
+				hw.PrintLine("VCA_1_CV: " FLT_FMT(6), FLT_VAR(6, modulation_values_[0]));
 			} else {
 				hw.PrintLine("VCA_1_CV is unpatched!");
 			}
 			
 			if (is_patched_[1]) {
-				hw.PrintLine("VCA_2_CV: " FLT_FMT(6), FLT_VAR(6, vca2Cv));
+				hw.PrintLine("VCA_2_CV: " FLT_FMT(6), FLT_VAR(6, modulation_values_[1]));
 			} else {
 				hw.PrintLine("VCA_2_CV is unpatched!");
 			}
 
 			if (is_patched_[2]) {
-				hw.PrintLine("VCA_3_CV: " FLT_FMT(6), FLT_VAR(6, vca3Cv));
+				hw.PrintLine("VCA_3_CV: " FLT_FMT(6), FLT_VAR(6, modulation_values_[2]));
 			} else {
 				hw.PrintLine("VCA_3_CV is unpatched!");
 			}
 
 			if (is_patched_[3]) {
-				hw.PrintLine("VCA_4_CV: " FLT_FMT(6), FLT_VAR(6, vca4Cv));
+				hw.PrintLine("VCA_4_CV: " FLT_FMT(6), FLT_VAR(6, modulation_values_[3]));
 			} else {
 				hw.PrintLine("VCA_4_CV is unpatched!");
 			}
