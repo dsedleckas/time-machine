@@ -310,10 +310,10 @@ bool shouldCalibrate() {
 			(hw.GetAdcValue(SKEW_CV) < 0.01) && \
 			(hw.GetAdcValue(TIME_CV) < 0.01) && \
 			(hw.GetAdcValue(FEEDBACK_CV) < 0.01) && \
-			(hw.GetAdcValue(VCA_1_CV) < 0.01) && \
-			(hw.GetAdcValue(VCA_2_CV) < 0.01) && \
-			(hw.GetAdcValue(VCA_3_CV) < 0.01) && \
-			(hw.GetAdcValue(VCA_4_CV) < 0.01) && \
+			(!is_patched_[0]) && \
+			(!is_patched_[1]) && \
+			(!is_patched_[2]) && \
+			(!is_patched_[3]) && \
 			hw.gate_in_2.State();
 		
 		for(int i=0; i<9; i++) {
@@ -422,11 +422,6 @@ int main(void)
 				savedCalibrationData.skewCvOffset += skewCv;
 				savedCalibrationData.feedbackCvOffset += feedbackCv;
 
-				savedCalibrationData.vca1CvOffset += vca1Cv;
-				savedCalibrationData.vca2CvOffset += vca2Cv;
-				savedCalibrationData.vca3CvOffset += vca3Cv;
-				savedCalibrationData.vca4CvOffset += vca4Cv;
-
 				// wait 10ms
 				System::Delay(10);
 				// set LEDs
@@ -440,12 +435,9 @@ int main(void)
 			savedCalibrationData.timeCvOffset = savedCalibrationData.timeCvOffset / ((float)numSamples);
 			savedCalibrationData.skewCvOffset = savedCalibrationData.skewCvOffset / ((float)numSamples);
 			savedCalibrationData.feedbackCvOffset = savedCalibrationData.feedbackCvOffset / ((float)numSamples);
-
-			savedCalibrationData.vca1CvOffset = savedCalibrationData.vca1CvOffset / ((float)numSamples);
-			savedCalibrationData.vca2CvOffset = savedCalibrationData.vca2CvOffset / ((float)numSamples);
-			savedCalibrationData.vca3CvOffset = savedCalibrationData.vca3CvOffset / ((float)numSamples);
-			savedCalibrationData.vca4CvOffset = savedCalibrationData.vca4CvOffset / ((float)numSamples);
 			
+			//VCA calibration data cannot be calibrated as unpatched is connected to normalization probe
+
 			// set calibrated value to true
 			savedCalibrationData.calibrated = true;
 			
@@ -457,10 +449,11 @@ int main(void)
 	timeCvOffset = savedCalibrationData.timeCvOffset;
 	skewCvOffset = savedCalibrationData.skewCvOffset;
 	feedbackCvOffset = savedCalibrationData.feedbackCvOffset;
-	normalized_offsets_[0] = savedCalibrationData.vca1CvOffset;
-	normalized_offsets_[1] = savedCalibrationData.vca2CvOffset;
-	normalized_offsets_[2] = savedCalibrationData.vca3CvOffset;
-	normalized_offsets_[3] = savedCalibrationData.vca4CvOffset;
+	// Apply calibration offsets for VCA inputs
+//	normalized_offsets_[0] = savedCalibrationData.vca1CvOffset;
+//	normalized_offsets_[1] = savedCalibrationData.vca2CvOffset;
+//	normalized_offsets_[2] = savedCalibrationData.vca3CvOffset;
+//	normalized_offsets_[3] = savedCalibrationData.vca4CvOffset;
 
 	hw.StartLog();
 
@@ -508,6 +501,11 @@ int main(void)
 			hw.PrintLine("CV IN 2: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_5)));
 			hw.PrintLine("CV IN 3: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_6)));
 			hw.PrintLine("CV IN 4: " FLT_FMT(6), FLT_VAR(6, hw.GetAdcValue(CV_7)));
+
+			hw.PrintLine("VCA1_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.vca1CvOffset));
+			hw.PrintLine("VCA2_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.vca2CvOffset));
+			hw.PrintLine("VCA3_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.vca3CvOffset));
+			hw.PrintLine("VCA4_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.vca4CvOffset));
 
 			hw.PrintLine("TIME_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.timeCvOffset));
 			hw.PrintLine("FEEDBACK_CAL: " FLT_FMT(6), FLT_VAR(6, savedCalibrationData.feedbackCvOffset));

@@ -1,6 +1,7 @@
 #pragma once
 
 #define BODGE false
+#define INVERTED_SLIDERS true
 
 #include "daisy.h"
 #include "daisy_patch_sm.h"

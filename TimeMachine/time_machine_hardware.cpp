@@ -496,11 +496,20 @@ namespace time_machine
         #else
         const int muxMapping[] = {0,1,4,3,2,6,7,5};
         #endif
+
+        #if INVERTED_SLIDERS
+        if(idx==0) {
+            return 1.0 - adc.GetFloat(DRY_SLIDER);
+        } else {
+            return 1.0 - adc.GetMuxFloat(DELAY_SLIDERS, muxMapping[idx - 1]);
+        }
+        #else
         if(idx==0) {
             return adc.GetFloat(DRY_SLIDER);
         } else {
             return adc.GetMuxFloat(DELAY_SLIDERS, muxMapping[idx - 1]);
-        }
+        }        
+        #endif
     }
 
     void TimeMachineHardware::WriteNormalization(bool value) {
