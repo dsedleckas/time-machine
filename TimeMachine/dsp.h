@@ -1,6 +1,12 @@
 #include "daisysp.h"
 #include "biquad.h"
 
+float fastExp(float x) {
+    // Fast approximation of exponential function
+    // for input between 0 and 1, returns output between 0 and 1
+    return x * x;
+}
+
 int wrap_buffer_index(int x, int size) {
     while(x >= size) x -= size;
     while(x < 0) x += size;
@@ -12,7 +18,7 @@ int seconds_to_samples(float x, float sampleRate) {
 }
 
 float mix(float x, float a, float b) {
-    return x*(1-x) + b*x;
+    return a*(1-x) + b*x;
 }
 
 float clamp(float x, float a, float b) {
@@ -53,6 +59,11 @@ float minMaxKnob(float in, float dz=0.002) {
 float minMaxSlider(float in, float dz=0.002) {
     return minMaxKnob(in, dz);
 }
+
+float minMaxModulation(float in) {
+    return minMaxKnob(in, 0.008);
+}
+
 
 float softClip(float x, float kneeStart=0.9, float kneeCurve=5.0) {
     float linPart = clamp(x, -kneeStart, kneeStart);

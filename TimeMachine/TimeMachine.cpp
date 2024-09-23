@@ -138,11 +138,16 @@ float readHeadAmp(int sliderIdx) {
 	if (!is_patched_[modulationIndex]) {
 		return sliderAmpValue;
 	} 
-	// between -1 & 1
-	// -1 is silent, 1 is max volume
+
 	float modulationValue = modulation_values_[modulationIndex];
 	
-	return sliderAmpValue * modulationValue;
+	if (sliderAmpValue <= 0.0 ) {
+		return 0.0;
+	} else if (sliderAmpValue >= 1.0) {
+		return modulationValue;
+	} else {
+		return fastExp(sliderAmpValue) * modulationValue;
+	}
 }
  
 void DetectNormalization() {
@@ -211,13 +216,11 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 
 	// read modulation / normalized channels 
 	for (int i = 0; i < kNumNormalizedChannels; i++) {
-		modulation_values_[i] = 
-			modulation_slew_[i].Process(
-				clamp(
-					hw.GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i],
-					-1, 
-					1)
-				);
+		float mv = clamp(hw.GetAdcValue(normalized_channels_[i]) - normalized_offsets_[i], -1, 1);
+		mv = mv * 0.5 + 0.5;
+		mv = minMaxModulation(mv);
+		mv = modulation_slew_[i].Process(mv);
+		modulation_values_[i] = mv;
 	}
 	
 	// read slider values
